@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Recovery</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        
+        body {
+            background-color: #000;
+            color: #0f0;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        #terminal {
+            padding: 20px;
+            height: 100vh;
+            width: 100%;
+            overflow-y: auto;
+            display: block;
+        }
+        
+        #prompt {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+        }
+        
+        #prompt-text {
+            color: #0f0;
+            margin-right: 10px;
+        }
+        
+        #command-input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #0f0;
+            font-size: 16px;
+            width: 100%;
+            caret-color: #0f0;
+        }
+        
+        .output-line {
+            margin: 5px 0;
+            word-wrap: break-word;
+        }
+        
+        #desktop {
+            display: none;
+            height: 100vh;
+            width: 100%;
+            background-image: url('https://wallpaperaccess.com/full/1567666.jpg');
+            background-size: cover;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .icon {
+            width: 80px;
+            height: 90px;
+            position: absolute;
+            text-align: center;
+            cursor: pointer;
+        }
+        
+        .icon img {
+            width: 50px;
+            height: 50px;
+            margin-bottom: 5px;
+        }
+        
+        .icon-name {
+            color: white;
+            font-size: 12px;
+            text-shadow: 1px 1px 2px black;
+        }
+        
+        .window {
+            position: absolute;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            min-width: 400px;
+            min-height: 300px;
+            display: none;
+            resize: both;
+        }
+        
+        .window-header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: move;
+        }
+        
+        .window-title {
+            font-size: 14px;
+        }
+        
+        .window-controls {
+            display: flex;
+        }
+        
+        .control-button {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            margin-left: 5px;
+            cursor: pointer;
+        }
+        
+        .minimize {
+            background-color: #f1c40f;
+        }
+        
+        .maximize {
+            background-color: #2ecc71;
+        }
+        
+        .close {
+            background-color: #e74c3c;
+        }
+        
+        .window-content {
+            padding: 10px;
+            height: calc(100% - 35px);
+            overflow: auto;
+        }
+        
+        #taskbar {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            height: 40px;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+        }
+        
+        #start-button {
+            background-color: #0078d7;
+            color: white;
+            border: none;
+            padding: 5px 15px;
+            border-radius: 3px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+        
+        .taskbar-icon {
+            width: 30px;
+            height: 30px;
+            margin: 0 5px;
+            cursor: pointer;
+        }
+        
+        #clock {
+            margin-left: auto;
+            color: white;
+            font-size: 14px;
+            padding: 0 10px;
+        }
+        
+        #overlay-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: red;
+            padding: 20px;
+            border-radius: 5px;
+            font-size: 24px;
+            display: none;
+            z-index: 1000;
+        }
+        
+        .blinking-cursor {
+            animation: blink 1s step-end infinite;
+        }
+        
+        @keyframes blink {
+            50% {
+                opacity: 0;
+            }
+        }
+        
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+        
+        .loading-text {
+            color: white;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        
+        .progress-bar {
+            width: 300px;
+            height: 20px;
+            background-color: #333;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .progress {
+            height: 100%;
+            width: 0%;
+            background-color: #0078d7;
+            transition: width 0.5s;
+        }
+        
+        /* File Explorer Styles */
+        .folder, .file {
+            display: flex;
+            align-items: center;
+            padding: 5px;
+            margin: 3px 0;
+            cursor: pointer;
+        }
+        
+        .folder:hover, .file:hover {
+            background-color: #e0e0e0;
+        }
+        
+        .folder img, .file img {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+        }
+        
+        /* Browser Styles */
+        .browser-toolbar {
+            display: flex;
+            padding: 5px;
+            background-color: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .browser-button {
+            margin-right: 5px;
+            padding: 3px 8px;
+            background-color: #e0e0e0;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        .url-bar {
+            flex-grow: 1;
+            padding: 3px 8px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            margin: 0 5px;
+        }
+        
+        .browser-content {
+            padding: 10px;
+            height: calc(100% - 70px);
+        }
+        
+        /* Text Editor Styles */
+        .text-area {
+            width: 100%;
+            height: 100%;
+            border: none;
+            resize: none;
+            padding: 10px;
+            font-family: 'Courier New', Courier, monospace;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading-screen">
+        <div class="loading-text">System Loading...</div>
+        <div class="progress-bar">
+            <div class="progress" id="progress-bar"></div>
+        </div>
+    </div>
+
+    <div id="terminal">
+        <div class="output-line">System initialization...</div>
+        <div class="output-line">WARNING: Unauthorized access detected!</div>
+        <div class="output-line">YOUR COMPUTER HAS BEEN COMPROMISED!</div>
+        <div class="output-line">Enter a command to restore system functionality:</div>
+        <div class="output-line">Available commands: scan, recover, reset, debug</div>
+        <div id="output"></div>
+        <div id="prompt">
+            <span id="prompt-text">root@system:~#</span>
+            <input type="text" id="command-input" autofocus>
+        </div>
+    </div>
+
+    <div id="desktop">
+        <!-- Desktop Icons -->
+        <div class="icon" style="top: 20px; left: 20px;" onclick="openWindow('browser')">
+            <img src="https://cdn-icons-png.flaticon.com/512/888/888846.png" alt="Browser">
+            <div class="icon-name">Browser</div>
+        </div>
+        
+        <div class="icon" style="top: 120px; left: 20px;" onclick="openWindow('file-explorer')">
+            <img src="https://cdn-icons-png.flaticon.com/512/3767/3767084.png" alt="File Explorer">
+            <div class="icon-name">File Explorer</div>
+        </div>
+        
+        <div class="icon" style="top: 220px; left: 20px;" onclick="openWindow('text-editor')">
+            <img src="https://cdn-icons-png.flaticon.com/512/3094/3094453.png" alt="Text Editor">
+            <div class="icon-name">Text Editor</div>
+        </div>
+        
+        <div class="icon" style="top: 320px; left: 20px;" onclick="openWindow('settings')">
+            <img src="https://cdn-icons-png.flaticon.com/512/3524/3524659.png" alt="Settings">
+            <div class="icon-name">Settings</div>
+        </div>
+        
+        <!-- Windows -->
+        <div id="browser-window" class="window" style="top: 100px; left: 200px; width: 600px; height: 400px;">
+            <div class="window-header">
+                <div class="window-title">Web Browser</div>
+                <div class="window-controls">
+                    <div class="control-button minimize" onclick="minimizeWindow('browser')"></div>
+                    <div class="control-button maximize" onclick="maximizeWindow('browser')"></div>
+                    <div class="control-button close" onclick="closeWindow('browser')"></div>
+                </div>
+            </div>
+            <div class="window-content">
+                <div class="browser-toolbar">
+                    <div class="browser-button">←</div>
+                    <div class="browser-button">→</div>
+                    <div class="browser-button">↻</div>
+                    <input type="text" class="url-bar" value="https://www.example.com">
+                    <div class="browser-button">Go</div>
+                </div>
+                <div class="browser-content">
+                    <h2>Welcome to the Web</h2>
+                    <p>This is a simulated web browser. In a real scenario, this would display web content.</p>
+                    <p>Your connection appears to be insecure. Please update your security settings.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div id="file-explorer-window" class="window" style="top: 150px; left: 250px; width: 500px; height: 350px;">
+            <div class="window-header">
+                <div class="window-title">File Explorer</div>
+                <div class="window-controls">
+                    <div class="control-button minimize" onclick="minimizeWindow('file-explorer')"></div>
+                    <div class="control-button maximize" onclick="maximizeWindow('file-explorer')"></div>
+                    <div class="control-button close" onclick="closeWindow('file-explorer')"></div>
+                </div>
+            </div>
+            <div class="window-content">
+                <div class="folder">
+                    <img src="https://cdn-icons-png.flaticon.com/512/716/716784.png" alt="Folder">
+                    <span>Documents</span>
+                </div>
+                <div class="folder">
+                    <img src="https://cdn-icons-png.flaticon.com/512/716/716784.png" alt="Folder">
+                    <span>Pictures</span>
+                </div>
+                <div class="folder">
+                    <img src="https://cdn-icons-png.flaticon.com/512/716/716784.png" alt="Folder">
+                    <span>Downloads</span>
+                </div>
+                <div class="file">
+                    <img src="https://cdn-icons-png.flaticon.com/512/3997/3997593.png" alt="File">
+                    <span>important_data.txt</span>
+                </div>
+                <div class="file">
+                    <img src="https://cdn-icons-png.flaticon.com/512/3997/3997593.png" alt="File">
+                    <span>passwords.txt</span>
+                </div>
+                <div class="file">
+                    <img src="https://cdn-icons-png.flaticon.com/512/3997/3997593.png" alt="File">
+                    <span>system_backup.zip</span>
+                </div>
+            </div>
+        </div>
+        
+        <div id="text-editor-window" class="window" style="top: 120px; left: 300px; width: 550px; height: 380px;">
+            <div class="window-header">
+                <div class="window-title">Text Editor</div>
+                <div class="window-controls">
+                    <div class="control-button minimize" onclick="minimizeWindow('text-editor')"></div>
+                    <div class="control-button maximize" onclick="maximizeWindow('text-editor')"></div>
+                    <div class="control-button close" onclick="closeWindow('text-editor')"></div>
+                </div>
+            </div>
+            <div class="window-content">
+                <textarea class="text-area">Dear User,
+
+I've gained access to your system.
+All your files are now being monitored.
+Don't try to remove this message.
+
+To regain control of your system, follow these instructions:
+1. Do not disconnect from the internet
+2. Wait for further instructions
+3. Do not attempt to restart your computer
+
+- Unknown</textarea>
+            </div>
+        </div>
+        
+        <div id="settings-window" class="window" style="top: 80px; left: 350px; width: 500px; height: 400px;">
+            <div class="window-header">
+                <div class="window-title">System Settings</div>
+                <div class="window-controls">
+                    <div class="control-button minimize" onclick="minimizeWindow('settings')"></div>
+                    <div class="control-button maximize" onclick="maximizeWindow('settings')"></div>
+                    <div class="control-button close" onclick="closeWindow('settings')"></div>
+                </div>
+            </div>
+            <div class="window-content">
+                <h3>System Settings</h3>
+                <p style="color: red;">WARNING: Security features disabled!</p>
+                <p>Firewall: <span style="color: red;">OFF</span></p>
+                <p>Antivirus: <span style="color: red;">DISABLED</span></p>
+                <p>System Updates: <span style="color: red;">PENDING (15 critical updates)</span></p>
+                <p>Remote Access: <span style="color: red;">ENABLED</span></p>
+                <p>Data Encryption: <span style="color: red;">DISABLED</span></p>
+                <button style="margin-top: 20px; padding: 5px 10px; background-color: #0078d7; color: white; border: none; border-radius: 3px; cursor: pointer;">Restore Security Settings</button>
+            </div>
+        </div>
+        
+        <!-- Taskbar -->
+        <div id="taskbar">
+            <button id="start-button">Start</button>
+            <img src="https://cdn-icons-png.flaticon.com/512/888/888846.png" alt="Browser" class="taskbar-icon" onclick="openWindow('browser')">
+            <img src="https://cdn-icons-png.flaticon.com/512/3767/3767084.png" alt="File Explorer" class="taskbar-icon" onclick="openWindow('file-explorer')">
+            <img src="https://cdn-icons-png.flaticon.com/512/3094/3094453.png" alt="Text Editor" class="taskbar-icon" onclick="openWindow('text-editor')">
+            <div id="clock">00:00</div>
+        </div>
+    </div>
+    
+    <div id="overlay-message">REMOTE ACCESS ACTIVATED</div>
+
+    <script>
+        // Initial loading screen
+        function simulateLoading() {
+            let progress = 0;
+            const progressBar = document.getElementById('progress-bar');
+            
+            const interval = setInterval(() => {
+                progress += Math.random() * 10;
+                if (progress > 100) progress = 100;
+                
+                progressBar.style.width = progress + '%';
+                
+                if (progress === 100) {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        document.getElementById('loading-screen').style.display = 'none';
+                    }, 500);
+                }
+            }, 300);
+        }
+        
+        simulateLoading();
+        
+        // Terminal functionality
+        const commandInput = document.getElementById('command-input');
+        const output = document.getElementById('output');
+        const terminal = document.getElementById('terminal');
+        const desktop = document.getElementById('desktop');
+        
+        // Focus on command input when page loads
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                commandInput.focus();
+            }, 2000);
+        });
+        
+        // Keep focus on command input
+        document.addEventListener('click', () => {
+            if (terminal.style.display !== 'none') {
+                commandInput.focus();
+            }
+        });
+        
+        // Handle command input
+        commandInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                const command = this.value.trim().toLowerCase();
+                this.value = '';
+                
+                // Add command to output
+                const commandLine = document.createElement('div');
+                commandLine.className = 'output-line';
+                commandLine.innerHTML = `<span id="prompt-text">root@system:~#</span> ${command}`;
+                output.appendChild(commandLine);
+                
+                // Process command
+                processCommand(command);
+                
+                // Scroll to bottom
+                terminal.scrollTop = terminal.scrollHeight;
+            }
+        });
+        
+        function addOutput(text, delay = 0) {
+            setTimeout(() => {
+                const line = document.createElement('div');
+                line.className = 'output-line';
+                line.textContent = text;
+                output.appendChild(line);
+                terminal.scrollTop = terminal.scrollHeight;
+            }, delay);
+        }
+        
+        function typeOutput(text, delay = 0, speed = 30) {
+            return new Promise(resolve => {
+                setTimeout(() => {
+                    const line = document.createElement('div');
+                    line.className = 'output-line';
+                    output.appendChild(line);
+                    
+                    let i = 0;
+                    const typeInterval = setInterval(() => {
+                        if (i < text.length) {
+                            line.textContent += text.charAt(i);
+                            i++;
+                            terminal.scrollTop = terminal.scrollHeight;
+                        } else {
+                            clearInterval(typeInterval);
+                            resolve();
+                        }
+                    }, speed);
+                }, delay);
+            });
+        }
+        
+        async function processCommand(command) {
+            switch (command) {
+                case 'scan':
+                    await typeOutput('Initiating system scan...', 200);
+                    await typeOutput('Checking system files...', 1000);
+                    await typeOutput('Scanning memory...', 1500);
+                    await typeOutput('Scanning network connections...', 2000);
+                    await typeOutput('WARNING: Multiple threats detected!', 3000);
+                    await typeOutput('- Trojan.Backdoor.Remote found in system32/', 3500);
+                    await typeOutput('- Keylogger active in memory', 4000);
+                    await typeOutput('- Unauthorized remote connection established', 4500);
+                    await typeOutput('Scan complete. Use "recover" command to remove threats.', 5000);
+                    break;
+                    
+                case 'recover':
+                    await typeOutput('Initiating system recovery...', 200);
+                    await typeOutput('Removing malicious software...', 1000);
+                    await typeOutput('Closing unauthorized connections...', 2000);
+                    await typeOutput('Restoring system files...', 3000);
+                    await typeOutput('Recovery complete. System restart required.', 4000);
+                    await typeOutput('Preparing to restart system...', 5000);
+                    
+                    setTimeout(() => {
+                        // Transition to desktop
+                        terminal.style.display = 'none';
+                        desktop.style.display = 'block';
+                        updateClock();
+                        setTimeout(simulateRemoteAccess, 30000); // Start remote access simulation after 30 seconds
+                    }, 6000);
+                    break;
+                    
+                case 'reset':
+                    await typeOutput('Resetting system...', 200);
+                    await typeOutput('This will restart the page in 3 seconds.', 1000);
+                    
+                    setTimeout(() => {
+                        location.reload();
+                    }, 3000);
+                    break;
+                    
+                case 'debug':
+                    await typeOutput('System debug information:', 200);
+                    await typeOutput('OS: Simulated OS v1.0', 700);
+                    await typeOutput('CPU: Virtual Processor @ 3.2GHz', 1200);
+                    await typeOutput('Memory: 8192MB (Virtual)', 1700);
+                    await typeOutput('IP Address: 192.168.1.100', 2200);
+                    await typeOutput('Open Ports: 22, 80, 443, 3389', 2700);
+                    await typeOutput('Active Connections: 3', 3200);
+                    await typeOutput('System Uptime: ' + Math.floor(Math.random() * 24) + ' hours, ' + Math.floor(Math.random() * 60) + ' minutes', 3700);
+                    await typeOutput('Security Status: COMPROMISED', 4200);
+                    break;
+                    
+                default:
+                    addOutput(`Command not recognized: ${command}`, 200);
+                    addOutput('Available commands: scan, recover, reset, debug', 500);
+            }
+        }
+        
+        // Desktop functionality
+        function updateClock() {
+            const clock = document.getElementById('clock');
+            
+            function update() {
+                const now = new Date();
+                const hours = now.getHours().toString().padStart(2, '0');
+                const minutes = now.getMinutes().toString().padStart(2, '0');
+                clock.textContent = `${hours}:${minutes}`;
+            }
+            
+            update();
+            setInterval(update, 60000);
+        }
+        
+        // Window management
+        let activeWindow = null;
+        let zIndex = 10;
+        
+        function openWindow(windowName) {
+            const window = document.getElementById(`${windowName}-window`);
+            window.style.display = 'block';
+            bringToFront(window);
+            activeWindow = window;
+        }
+        
+        function closeWindow(windowName) {
+            const window = document.getElementById(`${windowName}-window`);
+            window.style.display = 'none';
+        }
+        
+        function minimizeWindow(windowName) {
+            const window = document.getElementById(`${windowName}-window`);
+            window.style.display = 'none';
+        }
+        
+        function maximizeWindow(windowName) {
+            const window = document.getElementById(`${windowName}-window`);
+            
+            if (window.dataset.isMaximized === 'true') {
+                // Restore
+                window.style.width = window.dataset.prevWidth;
+                window.style.height = window.dataset.prevHeight;
+                window.style.top = window.dataset.prevTop;
+                window.style.left = window.dataset.prevLeft;
+                window.dataset.isMaximized = 'false';
+            } else {
+                // Maximize
+                window.dataset.prevWidth = window.style.width;
+                window.dataset.prevHeight = window.style.height;
+                window.dataset.prevTop = window.style.top;
+                window.dataset.prevLeft = window.style.left;
+                
+                window.style.width = '100%';
+                window.style.height = 'calc(100% - 40px)'; // Account for taskbar
+                window.style.top = '0';
+                window.style.left = '0';
+                window.dataset.isMaximized = 'true';
+            }
+            
+            bringToFront(window);
+        }
+        
+        function bringToFront(window) {
+            window.style.zIndex = zIndex++;
+        }
+        
+        // Make windows draggable
+        document.querySelectorAll('.window').forEach(makeWindowDraggable);
+        
+        function makeWindowDraggable(window) {
+            const header = window.querySelector('.window-header');
+            let offsetX, offsetY, isDragging = false;
+            
+            header.addEventListener('mousedown', (e) => {
+                if (e.target.classList.contains('control-button')) return;
+                
+                isDragging = true;
+                offsetX = e.clientX - window.getBoundingClientRect().left;
+                offsetY = e.clientY - window.getBoundingClientRect().top;
+                bringToFront(window);
+                activeWindow = window;
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                
+                const x = e.clientX - offsetX;
+                const y = e.clientY - offsetY;
+                
+                // Keep window within viewport
+                const maxX = window.parentElement.clientWidth - window.clientWidth;
+                const maxY = window.parentElement.clientHeight - window.clientHeight;
+                
+                window.style.left = Math.max(0, Math.min(x, maxX)) + 'px';
+                window.style.top = Math.max(0, Math.min(y, maxY)) + 'px';
+            });
+            
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+            
+            window.addEventListener('mousedown', () => {
+                bringToFront(window);
+                activeWindow = window;
+            });
+        }
+        
+        // Remote access simulation
+        function simulateRemoteAccess() {
+            const overlayMessage = document.getElementById('overlay-message');
+            
+            // Show remote access message
+            overlayMessage.style.display = 'block';
+            setTimeout(() => {
+                overlayMessage.style.display = 'none';
+            }, 3000);
+            
+            // Start automated actions
+            setTimeout(automatedActions, 4000);
+        }
+        
+        function automatedActions() {
+            const actions = [
+                () => openWindow('file-explorer'),
+                () => openWindow('text-editor'),
+                () => simulateMouseMovement(),
+                () => openWindow('browser'),
+                () => openWindow('settings'),
+                () => closeWindow('file-explorer'),
+                () => simulateMouseMovement(),
+                () => closeWindow('browser')
+            ];
+            
+            let actionIndex = 0;
+            
+            function performNextAction() {
+                if (actionIndex < actions.length) {
+                    actions[actionIndex]();
+                    actionIndex++;
+                    setTimeout(performNextAction, Math.random() * 3000 + 2000);
+                } else {
+                    // Reset and start again after a delay
+                    actionIndex = 0;
+                    setTimeout(performNextAction, 10000);
+                }
+            }
+            
+            performNextAction();
+        }
+        
+        function simulateMouseMovement() {
+            const cursor = document.createElement('div');
+            cursor.style.position = 'absolute';
+            cursor.style.width = '20px';
+            cursor.style.height = '20px';
+            cursor.style.backgroundColor = 'transparent';
+            cursor.style.border = '2px solid red';
+            cursor.style.borderRadius = '50%';
+            cursor.style.pointerEvents = 'none';
+            cursor.style.zIndex = '9999';
+            document.body.appendChild(cursor);
+            
+            const startX = Math.random() * window.innerWidth;
+            const startY = Math.random() * window.innerHeight;
+            const endX = Math.random() * window.innerWidth;
+            const endY = Math.random() * window.innerHeight;
+            
+            cursor.style.left = startX + 'px';
+            cursor.style.top = startY + 'px';
+            
+            const duration = 2000;
+            const startTime = Date.now();
+            
+            function animate() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                const x = startX + (endX - startX) * progress;
+                const y = startY + (endY - startY) * progress;
+                
+                cursor.style.left = x + 'px';
+                cursor.style.top = y + 'px';
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    setTimeout(() => {
+                        document.body.removeChild(cursor);
+                    }, 500);
+                }
+            }
+            
+            animate();
+        }
+    </script>
+</body>
+</html>
